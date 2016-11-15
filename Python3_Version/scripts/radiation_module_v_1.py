@@ -6,7 +6,7 @@ mattheworion.cook@gmail.com
 """
 
 from math import cos, sin, pi, asin, acos
-from fixed_params import lati, longi, jday, time
+from fixed_params import lati, longi, time
 
 
 #  ***  In the original TREES C++ code (in util.cpp) this function
@@ -95,13 +95,10 @@ def calc_solar_elevation(z_angle):
     Se = 0.5 * pi - z_angle
     return(Se)
 
-
+#TODO: Ask Dave if Sc can be moved to Constants
 def calc_Qe(Se, jday):
     """Calculate extra-terrestrial radiation (Qe)"""
-
-    # Sc = solar constant (W m^-2)
-    Sc = 1370
-
+    Sc = 1370  # Sc = solar constant (W m^-2)
     Qe = cos((360 * jday) / 365)
     Qe = Qe * 0.033
     Qe = 1 + Qe
@@ -138,45 +135,38 @@ def calc_fd(tau_atm, Se):
     R *= 0.847 - 1.61
 
     K = (1.47 - R) / 1.66
-
     f_d = 0
 
     if (tau_atm <= 0.22):
         f_d = 1
-
     elif (tau_atm > 0.22 & tau_atm <= 0.35):
         f_d = 1 - 6.4 * (tau_atm - 0.22) ^ 2
-
     elif (tau_atm > 0.35 & tau_atm <= K):
         f_d = 1.47 - 1.66 * tau_atm
-
-    else tau_atm = R
+    else:
+        tau_atm = R
 
 
 def calc_Qod(fd, Qo):
     """Calculate total above canopy diffuse radiation (Qod) (W m^-2)"""
-    return(fd * Qo)
+    return fd * Qo
 
 
 def calc_Qob(Qod, Qo):
     """Calculate total above canopy beam radiation (Qob) (W m^-2)"""
-    return(Qo - Qod)
+    return Qo - Qod
 
 
 def calc_Iob(Qob):
     """ Calculate PAR in beam form (Iob) (W m^-2)"""
-    # fraction of PAR in beam form
-    fPARbeam = 0.5
-
-    return(fPARbeam * Qob)
+    fPARbeam = 0.5  # fraction of PAR in beam form
+    return fPARbeam * Qob
 
 
 def calc_Iod(Qod):
     """Calculate PAR in diffuse form (Iod) (W m^-2)"""
-
-    # fraction of PAR in diffuse form
-    fPARdiff = 0.5
-    return(fPARdiff * Qod)
+    fPARdiff = 0.5  # fraction of PAR in diffuse form
+    return fPARdiff * Qod
 
 
 def calc_QobNIR(Qob, Iob):
@@ -184,11 +174,11 @@ def calc_QobNIR(Qob, Iob):
     Calculate near infrared radiation (NIR) in beam form (QobNIR) (W m^-2)
     """
     QobNIR = Qob - Iob
-    return(QobNIR)
+    return QobNIR
 
 
 def calc_QodNIR(Qod, Iod):
     """
     Calculate near infrared radiation (NIR) in diffuse form (QodNIR) (W m^-2)
     """
-    return (Qod - Iod)
+    return Qod - Iod
