@@ -9,7 +9,7 @@
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 
-#TODO (Dave): Fill in empty argument descriptions
+#TODO (Matt/Dave): Fill in empty argument descriptions
 CalcGc0k <- function(Gsv0, Gva, L.k){
   # Function for estimating Gc0 for sun and shade leaves
   # Args:
@@ -19,6 +19,11 @@ CalcGc0k <- function(Gsv0, Gva, L.k){
   # Return:
   #   Gc0k for (k = sun OR shade) leaves
   
-  Gc0.k <- 1 / ((1 / Gsv0 * L.k) + (1 / Gva)) * (1 / L.k) * (1 / 1.6)
+  # TODO (Dave): Double check this equation
+  Gc0.k <- (1 / 1.6)
+  Gc0.k <- Gc0.k * (1 / L.k)
+  Gc0.k <- Gc0.k * (1 / Gsv0 * L.k) + (1 / Gva)
+  Gc0.k <- 1 / Gc0.k
+  
   return (Gc0.k)
 }

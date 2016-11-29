@@ -8,7 +8,7 @@ mattheworion.cook@gmail.com
 import TREES
 from constants import cp_air, vkk, gr_acc, ti
 from math import log, sqrt, log1p, pi, sin, cos
-from fixed_params import h_fixed_para, longi, lati
+from fixed_params import h_fixed_para, longi
 
 #TODO:TEMPORARY SOLUTION TO NEEDING GSV0
 gsv_0 = TREES.main()
@@ -60,7 +60,8 @@ def C2K(deg_C):
  
 #molar density of air @ pressure pressure (kPa), temp tcelsius (C)
 def calc_mol_den(pressure, tcelsius):
-    return 44.6 * pressure * 273.15 / (101.3 * C2K(tcelsius))
+    temp_conv = C2K(tcelsius)
+    return 44.6 * pressure * 273.15 / (101.3 * temp_conv)
 
 
 # calculating psi_h and psi_m at a known zeta (stability)

@@ -143,7 +143,7 @@ pore.size.index <- pore.size.index -  0.00000235 * p.sand2 * p.clay
 pore.size.index <- pore.size.index +  0.00798746 * p.clay2 * por 
 pore.size.index <- pore.size.index -  0.00674491 * por2 * p.clay
 
-# calculate e^pore.size.index
+# calculate e ^ pore.size.index
 pore.size.index <- exp(pore.size.index)
 
 # Calculate the residual

@@ -26,7 +26,8 @@ CorrectionLongitude <- function(longi){
   longi <- abs(longi)
   
   # calculate the central meridian
-  cen.meridian <- 15 * as.integer((longi + 7.5) / 15) # (to round off)
+  cen.meridian <- as.integer((longi + 7.5) / 15) # (to round off)
+  cen.meridian <- 15 * cen.meridian
   correction <- (cen.meridian - longi) / 15.0
   
   return (correction)
@@ -52,40 +53,54 @@ CalcZenithAngle <- function(lati,longi,jday,thyme){
   #   jday: The julian day
   #   thyme: The time of day
   # Returns:
-  #   The zenith angle
+  #   The zenith angle in radians
   
-  #longitude correction
-  corr <- CorrectionLongitude(longi)
+  # Longitude correction
+  long.corr <- CorrectionLongitude(longi)
   
-  #for calculations of corrections due to eq of time
+  # For calculations of corrections due to eq of time
   temp <- Deg2Rad(279.575 + (0.9856 * jday))
   
-  #calculate equation of time (Campbell and Norman 1998, Eq:11.4)
-  corr <- corr + (-104.7 * sin(temp) + 596.2 * sin(2 * temp) + 4.3 * sin(3 * temp) -12.7 * sin(4 * temp)
-                  -429.3 * cos(temp) -2.0 * cos(2 * temp) + 19.3 * cos(3 * temp)) / 3600.0
+  # TODO(Dave): Double check this equation
+  # Calculate equation of time (Campbell and Norman 1998, Eq:11.4)
+  corr <- -104.7 * sin(temp)
+  corr <- corr + (596.2 * sin(2 * temp))
+  corr <- corr + (4.3 * sin(3 * temp))
+  corr <- corr - (12.7 * sin(4 * temp))
+  corr <- corr - (429.3 * cos(temp))
+  corr <- corr - (2.0 * cos(2 * temp))
+  corr <- corr + (19.3 * cos(3 * temp))
+  corr <- corr / 3600.0
+  corr <- long.corr + corr
   
-  #calculate solar noon (Campbell and Norman 1998, Eq:11.3)
+  # Calculate solar noon (Campbell and Norman 1998, Eq:11.3)
   solnoon <- 12 - corr
   
-  #convert to radian
+  # Convert to radian
   lati <- Deg2Rad(lati) 
   
+  # TODO (Dave): Double check this equation
   #calculate solar declination (Campbell and Norman 1998, Eq:11.2)
-  temp <- Deg2Rad(278.97 + 0.9856 * jday
-                  + 1.9165 * sin(Deg2Rad(356.6 + 0.9856 * jday)))
+  temp <- 356.6 + 0.9856 * jday
+  temp <- Deg2Rad(temp)
+  temp <- 1.9165 * sin(temp)
+  temp <- temp + 0.9856 * jday
+  temp <- 278.97 + temp
+  temp <- Deg2Rad(temp)
   
   declin <- asin(0.39785 * sin(temp))
   
-  #calculate zenith angle [in radians] (Campbell and Norman 1998, Eq:11.1)
-  z.angle <- sin(lati) * sin(declin)
-  + cos(lati) * cos(declin) * 
-    cos(Deg2Rad(15 * thyme - solnoon))
-  
+  # TODO (Dave): Double check this equation
+  # Calculate zenith angle [in radians] (Campbell and Norman 1998, Eq:11.1)
+  z.angle <- 15 * thyme - solnoon
+  z.angle <- Deg2Rad(z.angle)
+  z.angle <- cos(z.angle)
+  z.angle <- z.angle * cos(declin)
+  z.angle <- cos(lati) * z.angle
+  z.angle <- sin(lati) * sin(declin) + z.angle
   z.angle <- acos(z.angle)
   
-  #return zenith angle in radians
-  return (z.angle) 
-  
+  return (z.angle)
 }
 
 
@@ -109,8 +124,15 @@ CalcQe <- function(Se, jday){
   # Returns:
   #   The extra-terrestrial radiation
   
+  #TODO(Dave): Double check this equation
   Sc <- 1370  # Solar constant (W m^-2)
-  Qe <- Sc * sin(Se) * ((1 + 0.033 * cos((360 * jday) / 365)))
+  
+  Qe <- 360 * jday
+  Qe <- Qe / 365
+  Qe <- cos(Qe)
+  Qe <- Qe * 0.033
+  Qe <- Qe + 1
+  Qe <- Sc * sin(Se) * Qe
   return (Qe)
 }
 

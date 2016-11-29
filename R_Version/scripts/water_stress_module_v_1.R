@@ -6,9 +6,9 @@
 # TREES water stress function parameter estimation module #
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
+#TODO (Matt): Fill in missing argument descriptions
 WaterStressParaEst <- function(psi_obs, plc_obs){
-  # Fit water stress model paras to 'plc_data' data using a sigmoid function 
-  # (numerator is set to 1, in order to get 0-100%).
+  # Fit water stress model paras to 'plc_data' data using a sigmoid function (numerator is set to 1, in order to get 0-100%).
   # Args:
   #   psi_obs: (MISSING)
   #   plc_obs: (MISSING)
