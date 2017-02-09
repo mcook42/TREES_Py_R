@@ -8,22 +8,22 @@
 # Leaf-specific stomatal conductance to CO2 prior to photosynthetic limitation (Gc0) module #
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-# function for estimating Gc0 for sun leaves
-#-----------------------------------------------------------------------------------------------
-calc_Gc0_sun <- function(Gsv0,Gva,L_sun){
-  
-  Gc0_sun <- 1/((1/Gsv0*L_sun)+(1/Gva)) * 1/L_sun * 1/1.6
-  
-  return(Gc0_sun)
-  
-}
 
-# function for estimating Gc0 for shade leaves
-#-----------------------------------------------------------------------------------------------
-calc_Gc0_shade <- function(Gsv0,Gva,L_shade){
+#TODO (Matt/Dave): Fill in empty argument descriptions
+CalcGc0k <- function(Gsv0, Gva, L.k){
+  # Function for estimating Gc0 for sun and shade leaves
+  # Args:
+  #   Gsv0: 
+  #   Gva:
+  #   L.k:
+  # Return:
+  #   Gc0k for (k = sun OR shade) leaves
   
-  Gc0_shade <- 1/((1/Gsv0*L_shade)+(1/Gva)) * 1/L_shade * 1/1.6
+  # TODO (Dave): Double check this equation
+  Gc0.k <- (1 / 1.6)
+  Gc0.k <- Gc0.k * (1 / L.k)
+  Gc0.k <- Gc0.k * (1 / Gsv0 * L.k) + (1 / Gva)
+  Gc0.k <- 1 / Gc0.k
   
-  return(Gc0_shade)
-  
+  return (Gc0.k)
 }

@@ -15,209 +15,255 @@
 #     thyme <- 5
 
 
-# function for longitude correction
-#-----------------------------------------------------------------------------------------------
 
-correction_longitude <- function(longi){
+CorrectionLongitude <- function(longi){
+  # Function for longitude correction
+  # Args:
+  #   longi: longitude
+  # Return:
+  #   The corrected longitude
   
   longi <- abs(longi)
   
   # calculate the central meridian
-  cen_meridian <- 15*as.integer(((longi + 7.5)/15)) # (to round off)
-  correction <- (cen_meridian - longi)/15.0
+  cen.meridian <- as.integer((longi + 7.5) / 15) # (to round off)
+  cen.meridian <- 15 * cen.meridian
+  correction <- (cen.meridian - longi) / 15.0
   
-  return(correction)
-  
-}
-
-# function to convert degrees to radians  
-#-----------------------------------------------------------------------------------------------
-
-convert_deg2rad <- function(deg){
-  pi*deg/180.0
+  return (correction)
 }
 
 
-# function to calculate zenith angle 
-#-----------------------------------------------------------------------------------------------
-#thyme = time
-calc_zenith_angle <- function(lati,longi,jday,thyme){
+Deg2Rad <- function(deg){
+  # Function to convert degrees to radians
+  # Args:
+  #   deg: Angle in degrees
+  # Return:
+  #   The angle in radians
   
-  #longitude correction
-  corr <- correction_longitude(longi)
+  return (pi * deg / 180.0)
+}
+
+
+CalcZenithAngle <- function(lati,longi,jday,thyme){
+  # Function to calculate zenith angle 
+  # Args:
+  #   lati: The latitude
+  #   longi: The longitude
+  #   jday: The julian day
+  #   thyme: The time of day
+  # Returns:
+  #   The zenith angle in radians
   
-  #for calculations of corrections due to eq of time
-  temp <- deg2rad(279.575 + (0.9856*jday))
+  # Longitude correction
+  long.corr <- CorrectionLongitude(longi)
   
-  #calculate equation of time (Campbell and Norman 1998, Eq:11.4)
-  corr <- corr + (-104.7*sin(temp) +596.2*sin(2*temp) +4.3*sin(3*temp) -12.7*sin(4*temp)
-                  -429.3*cos(temp) -2.0*cos(2*temp) +19.3*cos(3*temp))/3600.0
+  # For calculations of corrections due to eq of time
+  temp <- Deg2Rad(279.575 + (0.9856 * jday))
   
-  #calculate solar noon (Campbell and Norman 1998, Eq:11.3)
+  # TODO(Dave): Double check this equation
+  # Calculate equation of time (Campbell and Norman 1998, Eq:11.4)
+  corr <- -104.7 * sin(temp)
+  corr <- corr + (596.2 * sin(2 * temp))
+  corr <- corr + (4.3 * sin(3 * temp))
+  corr <- corr - (12.7 * sin(4 * temp))
+  corr <- corr - (429.3 * cos(temp))
+  corr <- corr - (2.0 * cos(2 * temp))
+  corr <- corr + (19.3 * cos(3 * temp))
+  corr <- corr / 3600.0
+  corr <- long.corr + corr
+  
+  # Calculate solar noon (Campbell and Norman 1998, Eq:11.3)
   solnoon <- 12 - corr
   
-  #convert to radian
-  lati <- deg2rad(lati) 
+  # Convert to radian
+  lati <- Deg2Rad(lati) 
   
+  # TODO (Dave): Double check this equation
   #calculate solar declination (Campbell and Norman 1998, Eq:11.2)
-  temp <- deg2rad(278.97 + 0.9856*jday
-                  + 1.9165*sin(deg2rad(356.6+0.9856*jday)))
+  temp <- 356.6 + 0.9856 * jday
+  temp <- Deg2Rad(temp)
+  temp <- 1.9165 * sin(temp)
+  temp <- temp + 0.9856 * jday
+  temp <- 278.97 + temp
+  temp <- Deg2Rad(temp)
   
-  declin <- asin(0.39785*sin(temp))
+  declin <- asin(0.39785 * sin(temp))
   
-  #calculate zenith angle [in radians] (Campbell and Norman 1998, Eq:11.1)
-  z_angle <- sin(lati)*sin(declin)
-  + cos(lati)*cos(declin)*
-    cos(deg2rad(15*thyme - solnoon))
+  # TODO (Dave): Double check this equation
+  # Calculate zenith angle [in radians] (Campbell and Norman 1998, Eq:11.1)
+  z.angle <- 15 * thyme - solnoon
+  z.angle <- Deg2Rad(z.angle)
+  z.angle <- cos(z.angle)
+  z.angle <- z.angle * cos(declin)
+  z.angle <- cos(lati) * z.angle
+  z.angle <- sin(lati) * sin(declin) + z.angle
+  z.angle <- acos(z.angle)
   
-  z_angle <- acos(z_angle)
-  
-  #return zenith angle in radians
-  return(z_angle) 
-  
+  return (z.angle)
 }
 
 
-# function to calculate solar elevation
-#-----------------------------------------------------------------------------------------------
-calc_solar_elevation <- function(z_angle){
+CalcSolarElevation <- function(z.angle){
+  # Function to calculate solar elevation
+  # Args:
+  #   z.angle = The zenith angle
+  # Returns:
+  #   The solar elevation
   
-  Se <- 0.5*pi() - z_angle
-  
-  return(Se)
-
+  Se <- 0.5 * pi() - z.angle
+  return (Se)
 }
 
 
-# function to calculate extra-terrestrial radiation (Qe)
-#-----------------------------------------------------------------------------------------------
-calc_Qe <- function(Se,jday){
+CalcQe <- function(Se, jday){
+  # Function to calculate extra-terrestrial radiation (Qe)
+  # Args:
+  #   Se: The solar elevation
+  #   jday: The Julian day
+  # Returns:
+  #   The extra-terrestrial radiation
   
-  # Sc = solar constant (W m^-2)
-  Sc <- 1370 
+  #TODO(Dave): Double check this equation
+  Sc <- 1370  # Solar constant (W m^-2)
   
-  Qe <- Sc * sin(Se) * ((1+0.033*cos((360*jday)/365)))
-  
-  return(Qe)
-  
+  Qe <- 360 * jday
+  Qe <- Qe / 365
+  Qe <- cos(Qe)
+  Qe <- Qe * 0.033
+  Qe <- Qe + 1
+  Qe <- Sc * sin(Se) * Qe
+  return (Qe)
 }
 
 
-# function to convert photosynthetical active radiation (PAR) (umol m^-2 s^-1) from input 
-# to total incoming above-canopy radiation (Qo) (W m^-2)
-#-----------------------------------------------------------------------------------------------
-calc_Qo <- function(PAR){
+CalcQo <- function(PAR){
+  # Function to convert photosynthetically active radiation from input 
+  # to total incoming above-canopy radiation (Qo)
+  # Args:
+  #   PAR: Photosynthetically active radiation (umol m^-2 s^-1)
+  # Returns:
+  #   Total incoming above-canopy radiation (W m^-2)
   
   # factor used to convert PAR to total incoming solar radiation
-  con_fac <- 2.12766
+  con.fac <- 2.12766
   
   # factor to convert units from umol m^-2 s^-1 to W m^-2
-  con_units <- 0.235
+  con.units <- 0.235
   
-  Qo <- PAR * con_fac * con_units
+  Qo <- PAR * con.fac * con.units
   
-  return(Qo)
-  
+  return (Qo)
 }
 
 
-# function to calculate atmospheric transmissivity
-#-----------------------------------------------------------------------------------------------
-calc_tau_atm <- function(Qo,Qe){
-  
-  tau_atm <- Qo/Qe
-  
-  return(tau_atm)
-  
+CalcTauAtm <- function(Qo, Qe){
+  # Function to calculate atmospheric transmissivity
+  # Args:
+  #   Qo: Incoming above-canopy radiation (W m^-2)
+  #   Qe: The extra-terrestrial radiation
+  # Returns:
+  #   Atmospheric transmissivity
+
+  return (Qo / Qe)
 }
 
 
-# function to calculate fraction of total above canopy radiation in diffuse form
-#-----------------------------------------------------------------------------------------------
-calc_fd <- function (tau_atm,Se) {
+CalcFd <- function (tau.atm, Se) {
+  # Function to calculate fraction of total above canopy radiation in diffuse form
+  # Args:
+  #   tau.atm: Atmospheric transmissivity
+  #   Se: Solar elevation
+  # Return:
+  #   Fraction of total above canopy radiation in diffuse form
   
-  R <- 0.847 - 1.61*sin(Se) + 1.04*sin(Se)*sin(Se)
+  R <- 0.847 - 1.61 * sin(Se) + 1.04 * sin(Se) * sin(Se)
 
-  K <- (1.47-R)/1.66
+  K <- (1.47 - R) / 1.66
   
   f_d <- 0
   
-  if (tau_atm <= 0.22) {
-  f_d <- 1
-  } 
-  else if (tau_atm > 0.22 & tau_atm <= 0.35) {
-    f_d <- 1-6.4*(tau_atm-0.22)^2
+  if (tau.atm <= 0.22) {
+    f_d <- 1
+  } else if (tau.atm > 0.22 & tau.atm <= 0.35) {
+    f_d <- 1 - 6.4 * (tau.atm - 0.22) ^ 2
+  } else if (tau.atm > 0.35 & tau.atm <= K) {
+    f_d <- 1.47 - 1.66 * tau.atm
+  } else{
+    tau.atm <- R
   }
-  else if (tau_atm > 0.35 & tau_atm <= K) {
-    f_d <- 1.47-1.66*tau_atm
-  }
-  else tau_atm <- R
 
-}
-
-# function to calculate total above canopy diffuse radiation (Qod) (W m^-2)
-#-----------------------------------------------------------------------------------------------
-calc_Qod <- function(fd,Qo){
-  
-  Qod <- fd*Qo
-  
-  return(Qod)
-  
+  #TODO (Dave): What does this return?
 }
 
 
-# function to calculate total above canopy beam radiation (Qob) (W m^-2)
-#-----------------------------------------------------------------------------------------------
-calc_Qob <- function(Qod,Qo){
-  
-  Qob <- Qo - Qod
-  
-  return(Qob)
-  
+CalcQod <- function(fd, Qo){
+  # Function to calculate total above canopy diffuse radiation 
+  # Args:
+  #   fd: Above canopy radiation in diffuse form 
+  #   Qo: Incoming above-canopy radiation (W m^-2)
+  # Returns:
+  #   Total above canopy diffuse radiation (W m^-2)
+  return (fd * Qo)
 }
 
-# function to calculate PAR in beam form (Iob) (W m^-2)
-#-----------------------------------------------------------------------------------------------
-calc_Iob <- function(Qob){
-  
-  # fraction of PAR in beam form
-  fPARbeam <- 0.5
-  
-  Iob <- fPARbeam*Qob
-  
-  return(Iob)
-  
+
+CalcQob <- function(Qod, Qo){
+  # Function to calculate total above canopy beam radiation (Qob) (W m^-2)
+  # Args:
+  #   Qod: Total above canopy diffuse radiation (W m^-2)
+  #   Qo: Incoming above-canopy radiation (W m^-2)
+  # Returns:
+  #   Total above canopy beam radiation (W m^-2)
+  return (Qo - Qod)
 }
 
-# function to calculate PAR in diffuse form (Iod) (W m^-2)
-#-----------------------------------------------------------------------------------------------
-calc_Iod <- function(Qod){
+
+CalcIob <- function(Qob){
+  # Function to calculate PAR in beam form (Iob) (W m^-2)
+  # Args:
+  #   Qob: Total above canopy beam radiation (W m^-2)
+  # Return:
+  #   Photosynthetically active radiation in beam form (W m^-2)
   
-  # fraction of PAR in diffuse form
-  fPARdiff <- 0.5
-  
-  Iod <- fPARdiff*Qod
-  
-  return(Iod)
-  
+  fPARbeam <- 0.5  # Fraction of PAR in beam form
+  Iob <- fPARbeam * Qob
+  return (Iob)
 }
 
-# function to calculate near infrared radiation (NIR) in beam form (QobNIR) (W m^-2)
-#-----------------------------------------------------------------------------------------------
-calc_QobNIR <- function(Qob,Iob){
+
+CalcIod <- function(Qod){
+  # Function to calculate PAR in diffuse form (Iod) (W m^-2)
+  # Args:
+  #   Qod: Total above canopy diffuse radiation (W m^-2)
+  # Return:
+  #   Photosynthetically active radiation in diffuse form (W m^-2)
+  
+  fPARdiff <- 0.5  # Fraction of PAR in diffuse form
+  Iod <- fPARdiff * Qod
+  return (Iod)
+}
+
+
+CalcQobNIR <- function(Qob, Iob){
+  # Function to calculate near infrared radiation (NIR) in beam form (QobNIR) (W m^-2)
+  # Args: 
+  #   Qob: Total above canopy beam radiation (W m^-2)
+  #   Iob: Photosynthetically active radiation in beam form (W m^-2)
+  # Return:
+  #   Near infrared radiation (NIR) in beam form (W m^-2)
   
   QobNIR <- Qob - Iob
-  
-  return(QobNIR)
-  
+  return (QobNIR)
 }
 
-# function to calculate near infrared radiation (NIR) in diffuse form (QodNIR) (W m^-2)
-#-----------------------------------------------------------------------------------------------
-calc_QodNIR <- function(Qod,Iod){
+
+CalcQodNIR <- function(Qod,Iod){
+  # Function to calculate near infrared radiation (NIR) in diffuse form (QodNIR) (W m^-2)  
+  # Args:
+  #   Qod: Total above canopy diffuse radiation (W m^-2)
+  #   Iod: Photosynthetically active radiation in diffuse form (W m^-2)
   
   QodNIR <- Qod - Iod
-  
-  return(QodNIR)
-  
+  return (QodNIR)
 }

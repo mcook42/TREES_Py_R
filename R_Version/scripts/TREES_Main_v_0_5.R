@@ -19,12 +19,12 @@ setwd("C:\\Users\\Dave\\Documents\\TREES_Py_R\\TREES_Py_R\\R_Version")
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 #Get reference stomatal conductance parameter estimation module source code
-Gs_ref_para_est_module <- file.path('scripts\\Gs_ref_module_v_1.R')
-source(Gs_ref_para_est_module)
+Gs.ref.para.est.module <- file.path('scripts\\Gs_ref_module_v_1.R')
+source(Gs.ref.para.est.module)
 
 #Get water stress function parameter estimation module source code
-water_stress_para_est_module <- file.path('scripts\\water_stress_module_v_1.R')
-source(water_stress_para_est_module)
+water.stress.para.est.module <- file.path('scripts\\water_stress_module_v_1.R')
+source(water.stress.para.est.module)
 
 #~~~~~~~~~~~~~~~~~~~~~~~#
 # MODEL PROCESS MODULES #
@@ -35,18 +35,14 @@ source(water_stress_para_est_module)
 
 
 #Get aerodynamic resistance module source code
-Gva_module <- file.path('scripts\\aerodynamic_conductance_module_v_1.R')
-source(Gva_module)
+Gva.module <- file.path('scripts\\aerodynamic_conductance_module_v_1.R')
+source(Gva.module)
 
 #Get Gsv0 module source code
-Gsv0_module <- file.path('scripts\\Gsv0_module_v_1.R')
-source(Gsv0_module)
+Gsv0.module <- file.path('scripts\\Gsv0_module_v_1.R')
+source(Gsv0.module)
 
-#Get Gc0_k module source code
-Gc0_k_module <- file.path('scripts\\Gc0_k_module_v_1.R')
-source(Gc0_k_module)
-
-
-
-
+#Get Gc0.k module source code
+Gc0.k.module <- file.path('scripts\\Gc0_k_module_v_1.R')
+source(Gc0.k.module)
 
