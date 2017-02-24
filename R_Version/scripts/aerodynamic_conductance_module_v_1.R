@@ -6,33 +6,33 @@
 # TREES aerodynamic conductance (gva) module #
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-#TODO (Matt/Dave): Fill in the empty argument descriptions
-CalcGva <- function(z, h, u_air, P_air, T_air){
+# 02/24/17 for parallelization testing, assume z = 18 m, and h = 11 m.
+
+CalcGva <- function(z, h, u_ref, P_ref, T_ref){
   # Function for calculating aerdynamic conductance
   # Args:
-  #   z:
-  #   h:
-  #   u_air:
-  #   P_air:
-  #   T_air:
+  #   z: height of instruments on tower (reference height) (m)
+  #   h: canopy height (m)
+  #   u_ref: wind speed @ reference height (m s-1)
+  #   P_ref: atomspheric pressure @ reference height (kPa)
+  #   T_ref: air temperature @ reference height (Celcius)
   # Returns:
   #   The calculated value of Gva
   
-  
-  #------------------------#
+    #------------------------#
   # Calculate subequations #
   #------------------------#
   # TODO(Dave): Double check this equation
   # Calculate the molar density of air
-  rho_air <- 44.6 * P_air
+  rho_air <- 44.6 * P_ref
   rho_air <- rho_air * 273.15
-  rho_air <- rho_air / (101.3 * (273.15 + T_air))
+  rho_air <- rho_air / (101.3 * (273.15 + T_ref))
   
   # Calculate zero-plane displacement for canopy height (Campbell and Norman 1998, Eq:5.2)
-  d <- 0.65 * h_fixed_para
+  d <- 0.65 * h
   
   # Calculate roughness length (Campbell and Norman 1998, Eq:5.3)
-  zm <- 0.1 * h_fixed_para
+  zm <- 0.1 * h
   
   # Calculate roughness length for heat (Campbell and Norman 1998, Eq:7.19)
   zh <- 0.2 * zm
@@ -57,7 +57,7 @@ CalcGva <- function(z, h, u_air, P_air, T_air){
   
   Gva <- (log / zm) + psi_m
   Gva <- Gva * ((logzd / zh) + psi_h)
-  Gva <- (k ^ 2 * rho_air * u) / Gva
+  Gva <- (k ^ 2 * rho_air * u_ref) / Gva
   
   return(Gva)
 }
