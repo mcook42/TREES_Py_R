@@ -61,7 +61,7 @@ def soil_water_potential(porosity,
     if psi_soil < -10:
         psi_soil = -10
 
-    return(psi_soil)
+    return psi_soil
 
 # Define user-inputted variables (hard-code for now)
 por = 0.5  # porosity
@@ -161,4 +161,4 @@ psi_soil = soil_water_potential(por,
                                 pore_size_index,
                                 residual)
 
-print(psi_soil)
+# print(psi_soil)

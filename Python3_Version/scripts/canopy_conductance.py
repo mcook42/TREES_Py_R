@@ -1,239 +1,254 @@
-# -*- coding: utf-8 -*-
-"""
-Written by Matt Cook
-Created October 11 2016
-mattheworion.cook@gmail.com
+# Matt Cook
+# mattheworion.cook@gmail.com
 
-"""
-import TREES
-from constants import cp_air, vkk, gr_acc, ti
-from math import log, sqrt, log1p, pi, sin, cos
-from fixed_params import h_fixed_para, longi
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# Canopy-absorbed radiation module #
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-#TODO:TEMPORARY SOLUTION TO NEEDING GSV0
-gsv_0 = TREES.main()
+# -------------------------------------------------------------------------------------------
+# These variables eventual should be read from a 'fixed parameters/constants' input file:
+#
+# LAI_total <- 3.2     *LAI = leaf area index*
+# Pcc <- 1.0           *Pcc = 'percent' canopy coverage (value must be 0-1)*
+# omega <- 1.0         *omega = canopy clumping factor (value must be 0-1)*
+# x_ratio <- 1.0       *x_ratio = ratio of average projected areas of canopy
+#                                 elements on horizontal and vertical surfaces
+#                                 (0 to infinity)*
+# sig <- 5.67E-8       *Stefan-Boltzmann constant (W m-2 K-4)
+# -------------------------------------------------------------------------------------------
+from math import exp, sqrt, pi, sin, cos
+import scipy.integrate as integrate
 
-# Temps in K to be calculated below, this makes the variables global (?)
-trK = None
-tcK = None
+def LAI_sun_calc(LAI_total, Pcc, Kbe):
+    """Calculate sunlit leaf area index"""
+    LAI_sun = exp(-Kbe * (LAI_total / Pcc))
+    LAI_sun = 1 - LAI_sun
+    LAI_sun = LAI_sun / Kbe
 
-def long_corr(longi):
-    longi = abs(longi)
-
-    #Calculate central meridian
-    cen_meridian = int((longi + 7.5)/15)
-    cen_meridian = cen_meridian * 15    
-    correction = (cen_meridian - longi) / 15.0
-
-    return correction
-       
-
-def deg2rad(deg):
-    """Converts degrees into radians."""
-    return (pi * (deg / 180))
+    return (LAI_sun)
 
 
-def zenith_angle(lati, longi, jday, thyme):
-    #Longitude correction
-    corr = long_corr(longi)
-    
-    #For calculations of corrections due to eq of time
-    temp = 279.575 + (0.9856 * jday)
-    temp = deg2rad(temp)
-    
-    #Add the equator in hours - eq. 11.4 in C&N
-    tmp_corr = -104.7 * sin(temp)
-    tmp_corr += 596.2 * sin(2 * temp) 
-    tmp_corr += 4.3 * sin(3 * temp)
-    tmp_corr += -12.7 * sin(4 * temp)
-    tmp_corr += -429.3 * cos(temp)
-    tmp_corr += -2.0 * cos(2 * temp)
-    tmp_corr += 19.3 * cos(3 * temp)
-    corr += tmp_corr / 3600.0
-    
-
-#TODO: Move to utils script
-#Convert degrees Celsius to Kelvin
-def C2K(deg_C):
-	return deg_C + 273.15
-
- 
-#molar density of air @ pressure pressure (kPa), temp tcelsius (C)
-def calc_mol_den(pressure, tcelsius):
-    temp_conv = C2K(tcelsius)
-    return 44.6 * pressure * 273.15 / (101.3 * temp_conv)
+def LAI_shade_calc(LAI_total, LAI_sun):
+    """Calculate shaded leaf area index"""
+    LAI_shd = LAI_total - LAI_sun
+    return LAI_shd
 
 
-# calculating psi_h and psi_m at a known zeta (stability)
-# eq. 7.26 & 7.27 -  Campbell & Norman
-def calc_psim(zeta):
-    """zeta (double): stability coefficient"""
-    if (zeta < 0):
-        psi_m =  -1.2*log((1.0 + sqrt(1.0 - 16.0*zeta))/2.0)
-    else:
-        #psi_m = 6.0*log(1 + zeta); This is slower, I presume
-        psi_m = 6.0*log1p(zeta)
-    return psi_m;
- 
- 
-def calc_psih(zeta):
-    """zeta (double): stability coefficient"""
-    if (zeta < 0):
-        return (calc_psim(zeta))/0.6
-    else:
-        return calc_psim(zeta)
+# NOTE: z_angle is calculated in radiation module.
+def Kbe_calc(omega, x_ratio, z_angle):
+    """Calculate elipsoid beam light extinction coefficient"""
+    Kbe = omega * (x_ratio ^ 2) + tan(z_angle)
+    Kbe = Kbe * tan(z_angle) ^ 0.5
+    Kbe = Kbe / (x_ratio + 1.774 * (x_ratio + 1.182) ^ -0.733)
+    return Kbe
 
 
-#TODO: Refactor this to work with Python. Copied from Simulator.cpp
-#trying to find by successive subst
-#refer 7.21, 7.24, 7.26 & 7.27, C&N
-def stability_sucs(tr,      #temp @ ref ht, C
-                   tc,      #temp in canopy, C
-                   z_ref,   #ref ht, m
-                   #parameters
-                   zm_factor,
-                   zh_factor,
-                   d_factor,
-                   #observations
-                   ur,       #wind speed @ ref ht, ms-1
-                   h_canopy, #canopy ht, m
-                   pressure): #atmospheric pressure, kPa
-
-    #true constants used are vkk and cp_air & gr_acc
-    #the fixed terms
-    dee = d_factor*h_canopy
-    zee_m = zm_factor*h_canopy
-    zee_h = zh_factor*zee_m
-    rho = calc_mol_den(pressure, tr) #molm-3
-    lnm = log((z_ref - dee)/zee_m)
-    lnh = log((z_ref - dee)/zee_h)
-    trK = C2K(tr)
-    tcK = C2K(tc)
- 
-    #the vars (initialized to None type as a placeholder and clarity)
-    #TODO: Initialize to appropriate variables
-    u_star, h_flux, zeta, psi_m, psi_h, delta = None
-    u_star_last, u_star_diff = None        #u* is what we need, so check this
-
-    #********** check effects F *************
-    u_star_accuracy = 0.001 #accuracy of ur is <= 0.01 m/s 042004 - a change @ 4th pl dec
-    i, sign_chk = None
-    n_times = 50  #give up after this
-    min_n = 10 #do at least 10 iterations 042004 - a change @ 4th pl dec
- 
-    #estimates using naive values
-    #TODO: Figure out h_flux
-    zeta = psi_m = psi_h = 0.0
-    u_star = u_star_last = ur*vkk/(lnm + psi_m)
-    h_flux = (tcK - trK)*vkk*rho*cp_air*u_star/(lnh + psi_h) #left as is 042004 mistake before?
-    
-    # For debugging
-    # print( "stability : ", zeta, "psi : ", psi_m, " ", psi_h,
-    #         " U*: ", u_star," H: ", h_flux)
-    
-    # iterate
-    u_star_diff = 1 # force loop
-    i = 0
-    while((u_star_diff > u_star_accuracy or i <= min_n) and i < n_times):
-        zeta = -(vkk) * gr_acc * z_ref * h_flux 
-        zeta /= (rho * cp_air * trK * u_star * u_star * u_star) #7.21 
-        #left as is 042004 mistake before?
-
-        #obtains same values
-        psi_m = calc_psim(zeta) #7.26 or 7.27
-        psi_h = calc_psih(zeta) #7.26 or 7.27
-        u_star = ur*vkk/(lnm + psi_m) #7.24
-        h_flux = (tcK - trK)* vkk *rho*cp_air*u_star/(lnh + psi_h) #unnumbered in C&N
-        #left as is 042004 mistake before?
-
-        u_star_diff = u_star_last - u_star
-        u_star_diff = abs(u_star_diff)
-        u_star_last = u_star
-        
-        #check
-        """
-        FOR DEBUGGING
-        print(" ", i, "\nstability : ", zeta, "psi : ", psi_m, " ", psi_h,
-                  " U*: ", u_star, " H: ", h_flux)
-        """
-        i += 1
-        #end for
+# TODO: Dave, there are unused parameters here and the equations don't match the parameters
+def R_sun_calc(Q_sun, tau_can, tau_atm, sig, T_air):
     """
-    FOR DEBUGGING
-    if(i >= n_times):
-        print("WARNING! ", n_times, " iterations exceeded.\n")
+    Calculate net absorbed radiation for the sunlit canopy (R_sun)
+    Args:
+        sig: Stefan-Boltzmann constant (W m-2 K-4)
+        Q_sun: incoming photosynthetically active radiation to sunlit canopy (W m-2)
+        tau_can: canopy transmissivity
+        tau_atm: atmospheric transmissivity (calculated in radiation module)
+        T_air: air temperature at reference height (Celcius)
+
+    NOTE: ground heat flux (G) would be subtracted from R_sun equation (assume it's zero here)
     """
-    return zeta
-    
-#calculating gHa to get gHr = gHa + gr
-def calc_gHa(uz,      #wind speed @ ref height, m/s (input varying by each timestep)
-             z,     #ref height, m (fixed)
-             canopy_ht,       #height of canopy, m (fixed)
-             #the followings are parameters
-             d_factor,        #d = d_factor*canopy_ht (fixed)
-             zm_factor,       #zm = zm_factor*canopy_ht (fixed)
-             zh_factor,       #zh = zh_factor*zm (fixed)
-             #the followings are calculated values
-             molar_dens,      #molar density of air, molm-3 
-             psi_m,           #diabatic correction factors assume fixed (0) FOR NOW
-             psi_h):          #assume fixed (0) FOR NOW
+    R_sun = Q_sun
+    R_sun -= tau_can * sig * T_air ^ 4
+    R_sun -= tau_air * sig * T_air ^ 4
 
-    lnz_d = log(z - d_factor * canopy_ht)
-    gHa = (lnz_d - log(zh_factor * zm_factor * canopy_ht) + psi_h)
-    gHa *= (lnz_d - log(zm_factor * canopy_ht) + psi_m)
-    gHa = (vkk * vkk * molar_dens * uz) / gHa
-    
-    #enable for debugging
+    return (R_sun)
+
+
+# -------------------------------------------------------------------------------------------
+
+# TODO: Dave, there are unused parameters here and the equations don't match the parameters
+def R_shd_calc(Q_shd, tau_can, tau_atm, sig, T_air):
+    """calculate net absorbed radiation for the shaded canopy (R_shd)
+
+    NOTE: ground heat flux (G) would be subtracted from R_shd equation (assume it's zero here)
+    Args:
+      sig: Stefan-Boltzmann constant (W m-2 K-4)
+      Q_shd: incoming photosynthetically active radiation to shaded canopy (W m-2)
+      tau_can: canopy transmissivity
+      tau_atm: atmospheric transmissivity (calculated in radiation module)
+      T_air: air temperature at reference height (Celcius)
+      """
+
+    R_shd = Q_shd
+    R_shd -= tau_can * sig * T_air ^ 4
+    R_shd -= tau_air * sig * T_air ^ 4
+
+    return R_shd
+
+
+def Q_sun_calc (alpha_PAR, Kbe, Iob, Id, Isc, alpha_NIR, Qob_NIR, Qd_NIR, Qsc_NIR):
     """
-    print(vkk, '\t', molar_dens, '\t', uz, '\t',
-            (lnz_d - log(zm_factor*canopy_ht) + psi_m), '\t', 
-            (lnz_d - log(zh_factor*zm_factor*canopy_ht) + psi_h), '\t', 
-            (vkk*vkk*molar_dens*uz), '\t', gHa, '\t' 
-            (log((z - d_factor*canopy_ht)/(zm_factor*canopy_ht))+psi_m), '\t', 
-            (log((z - d_factor*canopy_ht)
-                /(zh_factor*zm_factor*canopy_ht))+psi_h))
+    Calculate incoming radiation to the sunlit canopy (Q_sun)
+    Args:
+        Kbe: elipsoid beam light extinction coefficient
+        alpha_PAR: leaf absorptivity in PAR
+        Iob: PAR in beam form (W m-2)
+        Id: PAR in diffuse form (W m-2)
+        Isc: PAR in scattered form (W m-2)
+        alpha_NIR: leaf absorptivity in NIR (near infrared)
+        Qob_NIR:  NIR in beam form (W m-2)
+        Qd_NIR: NIR in diffuse form (W m-2)
+        Qsc_NIR: NIR in scattered form (W m-2)
+
     """
-    return g_ha
+    Q_sun = alpha_PAR * (Kbe * Iob + Id + Isc)
+    Q_sun = Q_sun + alpha_NIR * (Kbe * Qob_NIR + Qd_NIR + Qsc_NIR)
+
+    return Q_sun
 
 
-# Leaf specific conductances to CO2 for sunlit and canopy elements
-def calcgc0(gsv_0, L, g_va):
-    """Calculates leaf specific conductances to C02"""
-    denom = gsv_0 * L
-    denom = 1 / denom
-    denom = denom + (1 / g_va)
-    gc0 = 1 / denom
-    gc0 = gc0 * (1 / L)
-    gc0 = gc0 * (1 / 1.6)
-    return gc0
+def Q_shd_calc(alpha_PAR, Id, Isc, alpha_NIR, Qd_NIR, Qsc_NIR):
+    """
+    Calculate incoming radiation to the shaded canopy (Q_shd)
+    Args:
+        alpha_PAR: leaf absorptivity in PAR
+        Id: PAR in diffuse form (W m-2)
+        Isc: PAR in scattered form (W m-2)
+        alpha_NIR: leaf absorptivity in NIR (near infrared)
+        Qd_NIR: NIR in diffuse form (W m-2)
+        Qsc_NIR: NIR in scattered form (W m-2)
+   """
+    Q_shd = alpha_PAR * (Id + Isc)
+    Q_shd = Q_shd + alpha_NIR * (Qd_NIR + Qsc_NIR)
 
-############ Appendix C ############
-
-
-#TODO: Read in the p_air
-# Molar density of air (mol m^-3)
-p_air = None
-rho_mol = calc_mol_den(p_air, t_ref)
-zenith_angle = zenith(ti, lat, longi)
-
-# Wind speed (m s^1) at reference height
-u_z = None
-
-# Zero-plane displacement for canopy of height (m)
-d = 0.65 * h_fixed_para
-
-# Roughnss length (m)
-z_m = 0.1 * h_fixed_para
-
-# Roughness length for heat (m)
-z_h = 0.2 * z_m
-
-#Vapor and heat boundary layer conductances, respectively (mol m^-2 s^-1)
-g_va = g_ha = calc_gHa()#TODO: Fill in these arguments)
+    return Q_shd
 
 
-# Calculate gc0 sunlit element
-gc0_sun = calcgc0(gsv_0, L_sun, g_va)
+def Qd_PAR_calc(Qod_PAR, alpha_PAR, Kd, LAI_total):
+    """Calculate incident diffuse PAR (W m-2)"""
+    Qd_PAR = Qod_PAR
+    Qd_PAR *= (1 - exp(-sqrt(alpha_PAR) * Kd * LAI_total))
+    Qd_PAR /= (sqrt(alpha_PAR) * Kd * LAI_total)
+    return Qd_PAR
 
-# Calculate gc0 shaded element
-gc0_shd = calcgc0(gsv_0, L_shade, g_va)
+
+def Qsc_PAR_calc(Qob_PAR, alpha_PAR, Kbe, LAI_total):
+    """Calculate incident scattered PAR (W m-2)"""
+    Qsc_PAR *= exp(-sqrt(alpha_PAR) * Kbe * LAI_total)
+    Qsc_PAR -= Qob_PAR * exp(-Kbe * LAI_total)
+    Qsc_PAR /= 2
+
+    return Qsc_PAR
+
+
+def Qd_NIR_calc(Qod_NIR, alpha_NIR, Kd, LAI_total):
+    """Calculate incident diffuse NIR (W m-2)"""
+    Qd_NIR = Qod_NIR
+    Qd_NIR = Qd_NIR * (1 - exp(-sqrt(alpha_NIR) * Kd * LAI_total))
+    Qd_NIR = Qd_NIR / (sqrt(alpha_NIR) * Kd * LAI_total)
+
+    return Qd_NIR
+
+
+def Qsc_NIR_calc(Qob_NIR, alpha_NIR, Kbe, LAI_total):
+    """calculate incident scattered NIR (W m-2)"""
+    Qsc_NIR = Qob_NIR * exp(-sqrt(alpha_NIR) * Kbe * LAI_total)
+    Qsc_NIR = Qsc_NIR - Qob_NIR * exp(-Kbe * LAI_total)
+    Qsc_NIR = Qsc_NIR / 2
+    return Qsc_NIR
+
+
+def Kd_calc(tau_d, LAI_total):
+    """Calculate diffuse light extinction coefficient"""
+    Kd = -log(tau_d) / LAI_total
+    return Kd
+
+
+def tau_be_calc(Kbe, LAI_total):
+    """Calculate beam transmissivity"""
+    tau_be = exp(-Kbe * LAI_total)
+    return tau_be
+
+
+
+# calculate diffuse light transmissivity ?
+# This function is going to need some further work. I will look into this further on
+# Monday (02/27/17).
+
+# ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
+# This is how the integral in Eq. B13 of the appendix is handled in simulator.cpp
+# for the C++ version:
+#
+# //variables for numerical integration
+# double integral; //value of sum
+# int steps,i;
+# double Kb, psi, dpsi, max_psi;
+# //initialize
+# steps = 90; //about 1 degree steps
+# max_psi = M_PI_2; //pi/2
+# dpsi = max_psi/steps;
+# psi = 0.0;
+# integral = 0.0;
+# while(psi < max_psi) //left sum
+# {
+#  integral += exp(-cnpy_beam_ext(psi, l_angle, omega, p_crown)*lai_total)
+#  *sin(psi)*cos(psi)*dpsi;
+#   psi += dpsi;
+# }
+
+# tau_d = 2.0*integral;
+# ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
+
+# ATTEMPT #1: Trying to emulate the C++ version approach:
+
+def tau_d_calc(tau_be, z_angle):
+
+    steps = 90
+    max_z_angle = pi() / 2
+    dz_angle = max_z_angle / steps
+    z_angle = 0
+    integral = 0
+
+    while z_angle < max_z_angle:
+        integral += tau_be * sin(z_angle) * cos(z_angle) * dz_angle
+
+    tau_d = 2.0 * integral
+
+    return tau_d
+
+
+# ATTEMPT #2: Trying to R 'integrate' function approach:
+def num_int_func(z_angle, tau_be):
+    num_int = tau_be
+    num_int = num_int * sin(z_angle) * cos(z_angle)
+    return num_int
+
+# TODO: Dave, so I'm lost on this.  This is the correct structure, but I'm not sure
+# TODO: (cont) which parameters are needed here???
+def tau_d_calc(tau_be, z_angle, LAI_total):
+    num_int = integrate.quad(num_int_func, 0, pi / 2, args=(LAI_total, Kbe))
+    tau_d = num_int * 2
+    return tau_d
+
+
+def PAR_Ps_sun_calc(alpha_PAR, Kbe, Iob, Id, Isc):
+    """
+    calculate photosynthetically active radiation (PAR) used for photosynthesis (Ps)
+    in sunlit leaves
+    """
+    PAR_Ps_sun = alpha_PAR
+    PAR_Ps_sun = PAR_Ps_sun * (Kbe * Iob + Id + Isc)
+
+    return PAR_Ps_sun
+
+# TODO: Dave, are Kbe and Iob necessary parameters? If so, are they missing in the calculations?
+def PAR_Ps_shd_calc(alpha_PAR, Kbe, Iob, Id, Isc):
+    """
+    calculate photosynthetically active radiation (PAR) used for photosynthesis (Ps)
+    in shaded leaves
+    """
+
+    PAR_Ps_shd = alpha_PAR
+    PAR_Ps_shd = PAR_Ps_shd * (Id + Isc)
+
+    return PAR_Ps_shd
+

@@ -28,7 +28,7 @@ def long_corr(longi):
 
 # function to convert degrees to radians
 def deg2rad(deg):
-    return (pi * deg / 180.0)
+    return pi * deg / 180.0
 
 
 # NOTE: I tested this (calc_zenith_angle) against the unvectorized and it is
@@ -87,13 +87,14 @@ def calc_zenith_angle(lati, longi, jday, time):
     z_angle = acos(z_angle)
 
     # return zenith angle in radians
-    return(z_angle)
+    return z_angle
 
 
 def calc_solar_elevation(z_angle):
     """Calculate solar elevation"""
     Se = 0.5 * pi - z_angle
     return(Se)
+
 
 #TODO: Ask Dave if Sc can be moved to Constants
 def calc_Qe(Se, jday):
@@ -104,7 +105,7 @@ def calc_Qe(Se, jday):
     Qe = 1 + Qe
     Qe = Qe * sin(Se)
     Qe = Qe * Sc
-    return(Qe)
+    return Qe
 
 
 def calc_Qo(PAR):
@@ -117,7 +118,7 @@ def calc_Qo(PAR):
     # factor to convert units from umol m^-2 s^-1 to W m^-2
     con_units = 0.235
 
-    return(PAR * con_fac * con_units)
+    return PAR * con_fac * con_units
 
 
 def calc_tau_atm(Qo, Qe):

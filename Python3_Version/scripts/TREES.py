@@ -23,7 +23,6 @@
 
 import os
 
-import blue_stain_xylem_scaling_module as bsmod
 import water_stress_module as wsmod
 import gs_ref_module as gsr
 import gsv0
